@@ -2,157 +2,166 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PurchaseOrder;
-use App\Models\PoItem;
+use App\Models\Account;
 use App\Models\Product;
-use App\Models\Journal;
-use App\Models\JournalLine;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
+use App\Services\PurchaseService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderController extends Controller
 {
-    public function index()
+    public function __construct(private PurchaseService $service) {}
+
+    public function index(Request $request)
     {
-        $pos = PurchaseOrder::with('items.product')->latest()->get();
-        return view('purchase_orders.index', compact('pos'));
+        $orders = PurchaseOrder::with(['supplier', ...PurchaseOrder::SUMMARY_RELATIONS])
+            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
+            ->when($request->q, fn ($q, $s) => $q->where(fn ($w) => $w->where('po_number', 'like', "%{$s}%")
+                ->orWhereHas('supplier', fn ($sq) => $sq->where('name', 'like', "%{$s}%"))))
+            ->latest('id')
+            ->paginate(20)->withQueryString();
+
+        return view('purchase_orders.index', compact('orders'));
     }
 
     public function create()
     {
-        $products = Product::with('uomConversions')->get();
-        return view('purchase_orders.create', compact('products'));
+        $products = Product::where('is_active', true)
+            ->with(['activeUnits.unit'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'label' => "{$p->sku} — {$p->name}",
+                'hpp' => (float) $p->current_hpp,
+                'units' => $p->activeUnits->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $u->unit->name,
+                    'factor' => (float) $u->conversion_factor,
+                ])->values(),
+            ]);
+
+        return view('purchase_orders.create', [
+            'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
+            'products' => $products,
+        ]);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'supplier_name' => 'required',
-            'items' => 'required|array',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.uom_id' => 'required|exists:product_uom_conversions,id',
-            'items.*.qty_ordered' => 'required|numeric|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
+        $data = $request->validate([
+            'supplier_id' => ['required', 'exists:suppliers,id'],
+            'order_date' => ['required', 'date', 'before_or_equal:today'],
+            'notes' => ['nullable', 'string', 'max:255'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_unit_id' => ['required', 'distinct', 'exists:product_units,id'],
+            'items.*.qty_ordered' => ['required', 'numeric', 'gt:0'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+        ], [
+            'items.required' => 'Tambahkan minimal satu barang.',
+            'items.*.product_unit_id.distinct' => 'Produk dengan satuan yang sama tidak boleh dimasukkan dua kali.',
         ]);
 
-        DB::transaction(function () use ($validated) {
-            $total_amount = 0;
-            foreach ($validated['items'] as $item) {
-                $total_amount += ($item['qty_ordered'] * $item['unit_price']);
-            }
+        $po = $this->service->createOrder($data);
 
-            $po = PurchaseOrder::create([
-                'supplier_name' => $validated['supplier_name'],
-                'status' => 'pending',
-                'total_amount' => $total_amount,
-            ]);
-
-            foreach ($validated['items'] as $item) {
-                $po->items()->create($item);
-            }
-        });
-
-        return redirect()->route('purchase-orders.index')->with('success', 'PO created.');
+        return redirect()->route('purchase-orders.show', $po)->with('success', "PO {$po->po_number} dibuat.");
     }
 
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load('items.product', 'items.uom');
-        return view('purchase_orders.show', compact('purchaseOrder'));
-    }
-
-    public function receive(Request $request, $id)
-    {
-        $po = PurchaseOrder::with('items.uom')->findOrFail($id);
-        
-        $validated = $request->validate([
-            'items' => 'required|array',
-            'items.*.qty_received' => 'required|numeric|min:0',
-            'items.*.qty_retur' => 'required|numeric|min:0',
+        $purchaseOrder->load([
+            'supplier', 'creator',
+            'items.productUnit.product', 'items.productUnit.unit',
+            ...PurchaseOrder::SUMMARY_RELATIONS,
+            'receipts.items.purchaseOrderItem.productUnit.product', 'receipts.receiver', 'receipts.journal',
+            'returns.items.purchaseOrderItem.productUnit.product', 'returns.journal',
+            'payments.account', 'payments.journal',
         ]);
 
-        DB::transaction(function () use ($validated, $po) {
-            $allCompleted = true;
-            $anyReceived = false;
-            $totalNilaiMasuk = 0;
+        return view('purchase_orders.show', [
+            'po' => $purchaseOrder,
+            'cashAccounts' => Account::where('is_cash', true)->orderBy('code')->get(),
+        ]);
+    }
 
-            foreach ($validated['items'] as $itemId => $data) {
-                $poItem = $po->items()->where('id', $itemId)->lockForUpdate()->first();
-                if (!$poItem) continue;
+    public function receiveForm(PurchaseOrder $purchaseOrder)
+    {
+        if (! $purchaseOrder->canReceive()) {
+            return redirect()->route('purchase-orders.show', $purchaseOrder)->with('error', 'PO ini tidak dalam status menunggu barang.');
+        }
+        $purchaseOrder->load(['supplier', 'items.productUnit.product', 'items.productUnit.unit', 'items.receiptItems']);
 
-                $received = $data['qty_received'];
-                $retur = $data['qty_retur'];
+        return view('purchase_orders.receive', ['po' => $purchaseOrder]);
+    }
 
-                $poItem->update([
-                    'qty_received' => $poItem->qty_received + $received,
-                    'qty_retur' => $poItem->qty_retur + $retur,
-                ]);
+    public function receive(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $data = $request->validate([
+            'receipt_date' => ['required', 'date', 'before_or_equal:today', 'after_or_equal:' . $purchaseOrder->order_date->toDateString()],
+            'notes' => ['nullable', 'string', 'max:255'],
+            'items' => ['required', 'array'],
+            'items.*.qty_received' => ['nullable', 'numeric', 'min:0'],
+            'items.*.qty_rejected' => ['nullable', 'numeric', 'min:0'],
+        ]);
 
-                if ($poItem->qty_received < $poItem->qty_ordered) {
-                    $allCompleted = false;
-                }
-                
-                if ($received > 0) {
-                    $anyReceived = true;
-                    // Konversi UoM
-                    $multiplier = $poItem->uom->multiplier;
-                    $qtyBaseUnit = $received * $multiplier;
-                    
-                    $product = Product::where('id', $poItem->product_id)->lockForUpdate()->first();
-                    
-                    // Kalkulasi HPP Moving Average
-                    // Nilai stok lama
-                    $oldStockValue = $product->current_stock * $product->current_hpp;
-                    // Nilai masuk (di PO unit_price adalah harga per UoM)
-                    $incomingValue = $received * $poItem->unit_price;
-                    $totalNilaiMasuk += $incomingValue;
-                    
-                    $newTotalStock = $product->current_stock + $qtyBaseUnit;
-                    $newHpp = ($newTotalStock > 0) ? (($oldStockValue + $incomingValue) / $newTotalStock) : $product->current_hpp;
+        $gr = $this->service->receive($purchaseOrder, $data['receipt_date'], $data['items'], $data['notes'] ?? null);
 
-                    $product->update([
-                        'current_stock' => $newTotalStock,
-                        'current_hpp' => $newHpp,
-                    ]);
-                }
-            }
+        return redirect()->route('purchase-orders.show', $purchaseOrder)
+            ->with('success', "Penerimaan {$gr->gr_number} disimpan. Stok, HPP, dan jurnal telah diperbarui.");
+    }
 
-            if ($allCompleted) {
-                $po->update(['status' => 'komplit']);
-            } else if ($anyReceived) {
-                $po->update(['status' => 'parsial']);
-            }
+    public function returnForm(PurchaseOrder $purchaseOrder)
+    {
+        $purchaseOrder->load(['supplier', 'items.productUnit.product', 'items.productUnit.unit', ...PurchaseOrder::SUMMARY_RELATIONS]);
 
-            if ($totalNilaiMasuk > 0) {
-                // Jurnal: (Debit) Persediaan Barang, (Kredit) Utang Dagang
-                $journal = Journal::create([
-                    'reference_type' => 'PO',
-                    'reference_id' => $po->id,
-                    'date' => now(),
-                    'description' => 'Penerimaan Barang PO #' . $po->id,
-                ]);
+        if ($purchaseOrder->items->every(fn ($i) => $i->qtyReturnable() <= 0)) {
+            return redirect()->route('purchase-orders.show', $purchaseOrder)->with('error', 'Belum ada barang diterima yang bisa diretur.');
+        }
 
-                JournalLine::insert([
-                    [
-                        'journal_id' => $journal->id,
-                        'account_code' => '1140', // Asumsi Persediaan Barang
-                        'debit_amount' => $totalNilaiMasuk,
-                        'credit_amount' => 0,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ],
-                    [
-                        'journal_id' => $journal->id,
-                        'account_code' => '2110', // Asumsi Utang Dagang
-                        'debit_amount' => 0,
-                        'credit_amount' => $totalNilaiMasuk,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]
-                ]);
-            }
-        });
+        return view('purchase_orders.return', ['po' => $purchaseOrder]);
+    }
 
-        return redirect()->route('purchase-orders.show', $po->id)->with('success', 'Penerimaan barang berhasil disimpan.');
+    public function returnGoods(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $data = $request->validate([
+            'return_date' => ['required', 'date', 'before_or_equal:today'],
+            'reason' => ['required', 'string', 'max:255'],
+            'items' => ['required', 'array'],
+            'items.*' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $return = $this->service->returnGoods($purchaseOrder, $data['return_date'], $data['items'], $data['reason']);
+
+        return redirect()->route('purchase-orders.show', $purchaseOrder)
+            ->with('success', "Retur {$return->return_number} disimpan. Stok dan utang telah dikurangi.");
+    }
+
+    public function markAsPaid(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date', 'before_or_equal:today'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'account_id' => ['required', 'exists:accounts,id'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $payment = $this->service->pay($purchaseOrder, $data['payment_date'], (float) $data['amount'], (int) $data['account_id'], $data['notes'] ?? null);
+
+        return back()->with('success', "Pembayaran {$payment->payment_number} sebesar " . rp($payment->amount) . ' dicatat.');
+    }
+
+    public function markAsComplete(PurchaseOrder $purchaseOrder)
+    {
+        $this->service->markAsComplete($purchaseOrder);
+
+        return back()->with('success', 'PO ditutup. Sisa barang yang belum datang tidak akan diterima lagi.');
+    }
+
+    public function cancel(PurchaseOrder $purchaseOrder)
+    {
+        $this->service->cancel($purchaseOrder);
+
+        return back()->with('success', 'PO dibatalkan.');
     }
 }

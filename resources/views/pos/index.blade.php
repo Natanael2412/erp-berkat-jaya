@@ -12,7 +12,11 @@
         <!-- AlpineJS for POS interaction -->
         <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     </head>
-    <body class="font-sans antialiased bg-brand-base text-brand-dark min-h-screen" x-data="posSystem()">
+    <body class="font-sans antialiased bg-brand-base text-brand-dark min-h-screen" 
+          x-data="posSystem()"
+          @keydown.window.f2.prevent="checkout()"
+          @keydown.window.f4.prevent="$refs.searchInput.focus()"
+          @keydown.window.escape.prevent="if(confirm('Batalkan seluruh keranjang?')) cart = []">
         
         <header class="bg-brand-dark text-white p-4 flex justify-between items-center">
             <h1 class="text-2xl font-bold">POS - Berkat Jaya</h1>
@@ -26,7 +30,7 @@
             <!-- Kiri: Daftar Produk -->
             <div class="w-2/3 p-4 flex flex-col border-r border-gray-200 bg-white">
                 <div class="mb-4">
-                    <input type="text" x-model="searchQuery" placeholder="Cari berdasarkan SKU atau Nama Barang..." class="w-full p-3 border rounded-lg border-gray-300 focus:border-brand-primary focus:ring focus:ring-brand-primary focus:ring-opacity-50">
+                    <input type="text" x-ref="searchInput" x-model="searchQuery" @keydown.enter="handleBarcodeScan" placeholder="[F4] Cari / Scan Barcode SKU..." class="w-full p-3 border rounded-lg border-gray-300 focus:border-brand-primary focus:ring focus:ring-brand-primary focus:ring-opacity-50">
                 </div>
                 
                 <div class="flex-1 overflow-y-auto pr-2 grid grid-cols-2 md:grid-cols-3 gap-4 auto-rows-max">
@@ -83,7 +87,7 @@
                     </div>
 
                     <button @click="checkout" :disabled="cart.length === 0 || isProcessing" class="w-full py-3 bg-brand-primary text-white rounded font-bold text-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <span x-show="!isProcessing">Bayar / Selesai</span>
+                        <span x-show="!isProcessing">[F2] Bayar / Selesai</span>
                         <span x-show="isProcessing">Memproses...</span>
                     </button>
                 </div>
@@ -99,6 +103,10 @@
                     paymentMethod: 'Tunai',
                     isProcessing: false,
                     
+                    init() {
+                        this.$nextTick(() => { this.$refs.searchInput.focus(); });
+                    },
+                    
                     get filteredProducts() {
                         if(this.searchQuery === '') return this.products;
                         const lowerCaseQuery = this.searchQuery.toLowerCase();
@@ -106,6 +114,17 @@
                             p.name.toLowerCase().includes(lowerCaseQuery) || 
                             p.sku.toLowerCase().includes(lowerCaseQuery)
                         );
+                    },
+
+                    handleBarcodeScan() {
+                        const exactMatch = this.products.find(p => p.sku.toLowerCase() === this.searchQuery.toLowerCase());
+                        if (exactMatch) {
+                            this.addToCart(exactMatch);
+                            this.searchQuery = ''; // reset search setelah scan
+                        } else if (this.filteredProducts.length === 1) {
+                            this.addToCart(this.filteredProducts[0]);
+                            this.searchQuery = '';
+                        }
                     },
 
                     addToCart(product) {
@@ -163,10 +182,10 @@
 
                             const data = await response.json();
 
-                            if(response.ok && data.success) {
-                                alert('Transaksi Berhasil!');
-                                // Simulasi print struk
-                                console.log("Mencetak struk...");
+                            if(response.ok && data.message) {
+                                // Buka struk thermal di tab/window baru untuk print
+                                window.open(data.receipt_url, '_blank', 'width=400,height=600');
+                                // Refresh halaman kasir
                                 window.location.reload();
                             } else {
                                 alert('Error: ' + data.message);

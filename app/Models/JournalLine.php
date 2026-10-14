@@ -2,22 +2,30 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class JournalLine extends Model
 {
-    use HasFactory;
+    protected $fillable = ['journal_id', 'account_id', 'debit', 'credit', 'memo'];
 
-    protected $fillable = [
-        'journal_id',
-        'account_code',
-        'debit_amount',
-        'credit_amount',
+    protected $casts = [
+        'debit' => 'decimal:2',
+        'credit' => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new \LogicException('Baris jurnal tidak boleh diubah.'));
+        static::deleting(fn () => throw new \LogicException('Baris jurnal tidak boleh dihapus.'));
+    }
+
+    public function journal()
+    {
+        return $this->belongsTo(Journal::class);
+    }
 
     public function account()
     {
-        return $this->belongsTo(ChartOfAccount::class, 'account_code', 'code');
+        return $this->belongsTo(Account::class);
     }
 }

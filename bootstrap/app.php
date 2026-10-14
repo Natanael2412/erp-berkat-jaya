@@ -20,4 +20,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Pelanggaran aturan bisnis (stok kurang, jurnal tidak seimbang, dll.)
+        // ditampilkan sebagai pesan ke pengguna, bukan error 500.
+        $exceptions->render(function (\DomainException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            return back()->withInput()->with('error', $e->getMessage());
+        });
     })->create();

@@ -28,7 +28,9 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        // Kasir langsung ke POS; owner & admin ke dashboard. URL "intended" tidak dipakai
+        // agar kasir tidak diarahkan ke halaman yang tidak boleh diaksesnya.
+        return redirect()->to($request->user()->homeRoute());
     }
 
     /**
