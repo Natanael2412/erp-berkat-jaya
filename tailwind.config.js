@@ -33,7 +33,31 @@ export default {
                     warning: '#EA580C',
                     success: '#10B981',
                     danger: '#EF4444',
+                    // Warna persis dari logo Berkat Jaya
+                    teal: '#088F82',
+                    'teal-deep': '#066B62',
+                    orange: '#F47316',
+                    ink: '#141414',
                 },
+            },
+            keyframes: {
+                'fade-up': {
+                    '0%': { opacity: '0', transform: 'translateY(18px)' },
+                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                },
+                'float-slow': {
+                    '0%,100%': { transform: 'translateY(0)' },
+                    '50%': { transform: 'translateY(-10px)' },
+                },
+                'bolt-glow': {
+                    '0%,100%': { opacity: '.55', transform: 'scale(1)' },
+                    '50%': { opacity: '1', transform: 'scale(1.06)' },
+                },
+            },
+            animation: {
+                'fade-up': 'fade-up .7s cubic-bezier(.2,.7,.2,1) both',
+                'float-slow': 'float-slow 6s ease-in-out infinite',
+                'bolt-glow': 'bolt-glow 3.2s ease-in-out infinite',
             },
         },
     },

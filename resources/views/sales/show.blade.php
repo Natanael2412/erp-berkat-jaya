@@ -18,16 +18,16 @@
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Informasi Umum</h3>
-                    @if($sale->status === 'completed')
+                    @if(! $sale->isVoid())
                         <span class="badge badge-green">Selesai</span>
-                    @elseif($sale->status === 'voided')
-                        <span class="badge badge-red">Void</span>
+                    @else
+                        <span class="badge badge-red">Dibatalkan</span>
                     @endif
                 </div>
                 <div class="card-body space-y-4">
                     <div>
                         <div class="text-xs text-slate-500 uppercase tracking-wide font-bold">Waktu Transaksi</div>
-                        <div class="font-medium mt-1">{{ $sale->created_at->format('d/m/Y H:i:s') }}</div>
+                        <div class="font-medium mt-1">{{ $sale->sale_date->format('d/m/Y H:i:s') }}</div>
                     </div>
                     <div>
                         <div class="text-xs text-slate-500 uppercase tracking-wide font-bold">Kasir</div>
@@ -35,9 +35,9 @@
                     </div>
                     <div>
                         <div class="text-xs text-slate-500 uppercase tracking-wide font-bold">Metode Pembayaran</div>
-                        <div class="font-medium mt-1">{{ $sale->payment_method }}</div>
+                        <div class="font-medium mt-1">{{ $sale->paymentLabel() }}</div>
                     </div>
-                    @if($sale->status === 'voided')
+                    @if($sale->isVoid())
                     <div class="bg-red-50 p-3 rounded border border-red-200 mt-4">
                         <div class="text-xs text-red-600 uppercase tracking-wide font-bold mb-1">Dibatalkan Oleh</div>
                         <div class="font-medium text-red-800">{{ $sale->voider->name ?? '-' }}</div>
@@ -79,7 +79,7 @@
                 </div>
             </div>
             
-            @if(auth()->user()->isOwner() && $sale->status === 'completed')
+            @if(auth()->user()->isOwner() && ! $sale->isVoid())
             <div class="card border-red-200">
                 <div class="card-body">
                     <h3 class="text-red-700 font-bold mb-2">Batalkan (Void) Transaksi</h3>

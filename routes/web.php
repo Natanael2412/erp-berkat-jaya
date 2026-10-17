@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CashTransactionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -13,11 +14,9 @@ use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return auth()->check() ? redirect()->to(auth()->user()->homeRoute()) : view('welcome');
-});
+Route::get('/', LandingController::class)->name('home');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
@@ -62,7 +61,7 @@ Route::middleware('auth')->group(function () {
     // ===== Kasir & Owner: POS =====
     Route::middleware('role:owner,cashier')->group(function () {
         Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
-        Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
+        Route::post('/pos/checkout', [PosController::class, 'checkout'])->middleware('throttle:60,1')->name('pos.checkout');
         Route::get('/pos/receipt/{sale}', [PosController::class, 'receipt'])->name('pos.receipt');
     });
 });
