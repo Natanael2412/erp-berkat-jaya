@@ -40,7 +40,14 @@ class SalesService
                 if (! $unit || ! $unit->is_active || ! $unit->product->is_active) {
                     throw ValidationException::withMessages(['cart' => 'Ada produk/satuan yang tidak aktif. Muat ulang halaman POS.']);
                 }
-                $lines[] = ['unit' => $unit, 'qty' => round((float) $row['qty'], 4)];
+
+                $qty = round((float) $row['qty'], 4);
+                if (! $unit->unit->allowsDecimal() && abs($qty - round($qty)) > 0.00005) {
+                    throw ValidationException::withMessages([
+                        'cart' => "Satuan {$unit->unit->name} ({$unit->product->name}) tidak boleh berupa pecahan/desimal. Harus bilangan bulat.",
+                    ]);
+                }
+                $lines[] = ['unit' => $unit, 'qty' => $qty];
             }
 
             // Pessimistic locking: SELECT ... FOR UPDATE pada semua produk di keranjang.

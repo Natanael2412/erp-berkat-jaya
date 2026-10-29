@@ -19,19 +19,33 @@ class PosController extends Controller
             ->with(['activeUnits.unit', 'baseUnit'])
             ->orderBy('name')
             ->get()
-            ->map(fn ($p) => [
-                'id' => $p->id,
-                'sku' => $p->sku,
-                'name' => $p->name,
-                'stock' => (float) $p->current_stock,
-                'base_unit' => $p->baseUnit->name,
-                'units' => $p->activeUnits->map(fn ($u) => [
-                    'id' => $u->id,
-                    'name' => $u->unit->name,
-                    'factor' => (float) $u->conversion_factor,
-                    'price' => (float) $u->selling_price,
-                ])->values(),
-            ]);
+            ->map(function ($p) {
+                $baseUnitId = $p->base_unit_id;
+                $baseProductUnit = $p->activeUnits->firstWhere('unit_id', $baseUnitId) ?? $p->activeUnits->first();
+
+                return [
+                    'id' => $p->id,
+                    'sku' => $p->sku,
+                    'name' => $p->name,
+                    'stock' => (float) $p->current_stock,
+                    'formatted_stock' => num($p->current_stock),
+                    'base_unit' => $p->baseUnit?->name ?? 'Pcs',
+                    'base_unit_code' => $p->baseUnit?->code ?? 'PCS',
+                    'base_allows_decimal' => (bool) ($p->baseUnit?->allowsDecimal() ?? false),
+                    'default_unit_id' => $baseProductUnit?->id,
+                    'default_price' => (float) ($baseProductUnit?->selling_price ?? 0),
+                    'units' => $p->activeUnits->map(fn ($u) => [
+                        'id' => $u->id,
+                        'unit_id' => $u->unit_id,
+                        'name' => $u->unit->name,
+                        'code' => $u->unit->code,
+                        'factor' => (float) $u->conversion_factor,
+                        'price' => (float) $u->selling_price,
+                        'formatted_price' => rp($u->selling_price),
+                        'allows_decimal' => (bool) $u->unit->allowsDecimal(),
+                    ])->values(),
+                ];
+            });
 
         $todaySales = Sale::withTotal()
             ->where('cashier_id', auth()->id())

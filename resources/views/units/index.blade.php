@@ -17,6 +17,7 @@
                     this.id = unit.id;
                     this.code = unit.code;
                     this.name = unit.name;
+                    this.allows_decimal = !!unit.allows_decimal;
                     $refs.form.action = '/units/' + unit.id;
                     $refs.method.value = 'PUT';
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -26,6 +27,7 @@
                     this.id = '';
                     this.code = '';
                     this.name = '';
+                    this.allows_decimal = false;
                     $refs.form.action = '{{ route('units.store') }}';
                     $refs.method.value = 'POST';
                 }
@@ -52,6 +54,16 @@
                                 @error('name') <p class="input-error">{{ $message }}</p> @enderror
                             </div>
 
+                            <div class="pt-1">
+                                <label class="flex items-start gap-2.5 cursor-pointer">
+                                    <input type="checkbox" name="allows_decimal" value="1" x-model="allows_decimal" class="rounded border-slate-300 text-brand-teal focus:ring-brand-teal mt-1">
+                                    <span class="text-sm">
+                                        <strong class="font-bold text-slate-800">Izinkan Desimal / Pecahan</strong>
+                                        <span class="block text-xs text-slate-500">Khusus satuan seperti Meter (kabel eceran), Kg, Liter. Matikan untuk Pcs, Box, Dus, Batang.</span>
+                                    </span>
+                                </label>
+                            </div>
+
                             <button type="submit" class="btn w-full" :class="isEdit ? 'btn-warning' : 'btn-primary'" x-text="isEdit ? 'Simpan Perubahan' : 'Tambahkan Satuan'"></button>
                         </div>
                     </form>
@@ -60,7 +72,7 @@
                 <!-- Helper Data for Alpine -->
                 <div class="hidden">
                     @foreach($units as $unit)
-                        <button id="edit-btn-{{ $unit->id }}" @click="initEdit({{ json_encode(['id' => $unit->id, 'code' => $unit->code, 'name' => $unit->name]) }})"></button>
+                        <button id="edit-btn-{{ $unit->id }}" @click="initEdit({{ json_encode(['id' => $unit->id, 'code' => $unit->code, 'name' => $unit->name, 'allows_decimal' => (bool)$unit->allowsDecimal()]) }})"></button>
                     @endforeach
                 </div>
             </div>
@@ -78,6 +90,7 @@
                             <tr>
                                 <th>Kode</th>
                                 <th>Nama Satuan</th>
+                                <th>Tipe Kuantitas</th>
                                 <th class="text-right">Digunakan Di Produk</th>
                                 <th class="text-right">Aksi</th>
                             </tr>
@@ -87,6 +100,13 @@
                             <tr>
                                 <td class="font-mono font-bold">{{ $unit->code }}</td>
                                 <td class="font-bold text-gunmetal">{{ $unit->name }}</td>
+                                <td>
+                                    @if($unit->allowsDecimal())
+                                        <span class="badge badge-info text-xs">Desimal (Pecahan, e.g. 1.5 M)</span>
+                                    @else
+                                        <span class="badge badge-gray text-xs">Bulat (Non-Desimal)</span>
+                                    @endif
+                                </td>
                                 <td class="num">{{ $unit->product_units_count }}</td>
                                 <td class="text-right">
                                     <button onclick="document.getElementById('edit-btn-{{ $unit->id }}').click()" class="text-sm font-semibold text-orange-600 hover:text-orange-800">Edit</button>

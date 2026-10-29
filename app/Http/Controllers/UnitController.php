@@ -20,8 +20,10 @@ class UnitController extends Controller
         $data = $request->validate([
             'code' => ['required', 'string', 'max:20', 'alpha_dash', 'unique:units,code'],
             'name' => ['required', 'string', 'max:50'],
+            'allows_decimal' => ['nullable', 'boolean'],
         ]);
         $data['code'] = strtoupper($data['code']);
+        $data['allows_decimal'] = $request->boolean('allows_decimal');
 
         Unit::create($data);
 
@@ -33,8 +35,10 @@ class UnitController extends Controller
         $data = $request->validate([
             'code' => ['required', 'string', 'max:20', 'alpha_dash', Rule::unique('units', 'code')->ignore($unit->id)],
             'name' => ['required', 'string', 'max:50'],
+            'allows_decimal' => ['nullable', 'boolean'],
         ]);
         $data['code'] = strtoupper($data['code']);
+        $data['allows_decimal'] = $request->boolean('allows_decimal');
 
         $unit->update($data);
 

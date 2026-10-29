@@ -75,4 +75,54 @@ class PagesAndSecurityTest extends TestCase
 
         $this->assertTrue(\Illuminate\Support\Facades\Hash::check('rahasia-baru-123', $owner->fresh()->password));
     }
+
+    public function test_pos_page_renders_with_products_and_units(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $cashier = User::where('role', 'cashier')->first();
+        $this->actingAs($cashier);
+
+        $response = $this->get(route('pos.index'));
+        $response->assertOk();
+        $response->assertSee('POS · Berkat Jaya');
+        $response->assertSee('default_price');
+        $response->assertSee('allows_decimal');
+    }
+
+    public function test_pos_allows_decimal_for_meter_and_rejects_for_pcs(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $cashier = User::where('role', 'cashier')->first();
+        $this->actingAs($cashier);
+
+        $kabel = Product::where('sku', 'KBL-NYM-2X15')->first();
+        $meterUnit = $kabel->units()->where('unit_id', Unit::where('code', 'M')->value('id'))->first();
+
+        $lampu = Product::where('sku', 'LMP-LED-12W')->first();
+        $pcsUnit = $lampu->units()->where('unit_id', Unit::where('code', 'PCS')->value('id'))->first();
+
+        // 1. Kabel dengan satuan Meter boleh desimal (e.g. 2.5 meter)
+        $resMeter = $this->postJson(route('pos.checkout'), [
+            'payment_method' => 'cash',
+            'amount_paid' => 100000,
+            'cart' => [
+                ['product_unit_id' => $meterUnit->id, 'qty' => 2.5],
+            ],
+        ]);
+        $resMeter->assertOk();
+        $this->assertDatabaseHas('sales', ['payment_method' => 'cash']);
+
+        // 2. Lampu dengan satuan Pcs TIDAK boleh desimal (e.g. 1.5 Pcs)
+        $resPcs = $this->postJson(route('pos.checkout'), [
+            'payment_method' => 'cash',
+            'amount_paid' => 100000,
+            'cart' => [
+                ['product_unit_id' => $pcsUnit->id, 'qty' => 1.5],
+            ],
+        ]);
+        $resPcs->assertStatus(422);
+        $resPcs->assertJsonFragment([
+            'message' => "Satuan Pcs ({$lampu->name}) tidak boleh berupa pecahan/desimal. Harus bilangan bulat.",
+        ]);
+    }
 }

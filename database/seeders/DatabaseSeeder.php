@@ -59,10 +59,19 @@ class DatabaseSeeder extends Seeder
         }
 
         foreach ([
-            ['PCS', 'Pcs'], ['M', 'Meter'], ['ROLL', 'Roll'], ['BOX', 'Box'],
-            ['DUS', 'Dus'], ['PAK', 'Pak'], ['LSN', 'Lusin'], ['UNIT', 'Unit'],
-        ] as [$code, $name]) {
-            Unit::updateOrCreate(['code' => $code], ['name' => $name]);
+            ['PCS', 'Pcs', false],
+            ['M', 'Meter', true],
+            ['ROLL', 'Roll', false],
+            ['BOX', 'Box', false],
+            ['DUS', 'Dus', false],
+            ['PAK', 'Pak', false],
+            ['LSN', 'Lusin', false],
+            ['UNIT', 'Unit', false],
+        ] as [$code, $name, $allowsDecimal]) {
+            Unit::updateOrCreate(['code' => $code], [
+                'name' => $name,
+                'allows_decimal' => $allowsDecimal,
+            ]);
         }
 
         Supplier::updateOrCreate(['code' => 'SUP-001'], [
