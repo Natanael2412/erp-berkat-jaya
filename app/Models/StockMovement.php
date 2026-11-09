@@ -9,6 +9,7 @@ class StockMovement extends Model
 {
     protected $fillable = [
         'product_id',
+        'product_batch_id',
         'movement_date',
         'type',
         'source_type',
@@ -41,6 +42,11 @@ class StockMovement extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function batch()
+    {
+        return $this->belongsTo(ProductBatch::class, 'product_batch_id');
     }
 
     public function source()

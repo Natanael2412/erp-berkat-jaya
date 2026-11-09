@@ -60,7 +60,7 @@ class DatabaseSeeder extends Seeder
 
         foreach ([
             ['PCS', 'Pcs', false],
-            ['M', 'Meter', true],
+            ['M', 'Meter', false],
             ['ROLL', 'Roll', false],
             ['BOX', 'Box', false],
             ['DUS', 'Dus', false],

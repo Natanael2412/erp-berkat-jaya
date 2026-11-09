@@ -50,6 +50,27 @@ class Product extends Model
         return $this->hasMany(StockMovement::class);
     }
 
+    public function batches()
+    {
+        return $this->hasMany(ProductBatch::class)->orderBy('id');
+    }
+
+    public function availableBatches()
+    {
+        return $this->batches()->where('is_active', true)->where('remaining_qty', '>', 0);
+    }
+
+    public function hasRollUnit(): bool
+    {
+        if ($this->relationLoaded('units')) {
+            return $this->units->contains(fn ($pu) => $pu->is_active && strtoupper($pu->unit?->code ?? '') === 'ROLL');
+        }
+
+        return $this->units()->where('is_active', true)
+            ->whereHas('unit', fn ($q) => $q->whereRaw('UPPER(code) = ?', ['ROLL']))
+            ->exists();
+    }
+
     public function isLowStock(): bool
     {
         return (float) $this->current_stock <= (float) $this->min_stock;

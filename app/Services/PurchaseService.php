@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\GoodsReceipt;
+use App\Models\ProductBatch;
 use App\Models\ProductUnit;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReturn;
@@ -65,7 +66,7 @@ class PurchaseService
         return DB::transaction(function () use ($po, $date, $lines, $notes) {
             // Lock header PO: mencegah dua penerimaan bersamaan melebihi qty pesanan.
             $po = PurchaseOrder::whereKey($po->id)->lockForUpdate()->firstOrFail();
-            $po->load(['items.receiptItems', 'items.productUnit.product']);
+            $po->load(['items.receiptItems', 'items.productUnit.product', 'items.productUnit.unit']);
 
             if (! $po->canReceive()) {
                 throw new \DomainException('PO ini tidak dalam status menunggu barang.');
@@ -74,10 +75,10 @@ class PurchaseService
             $errors = [];
             $toProcess = [];
             foreach ($po->items as $item) {
-                $received = round((float) ($lines[$item->id]['qty_received'] ?? 0), 4);
-                $rejected = round((float) ($lines[$item->id]['qty_rejected'] ?? 0), 4);
+                $received = (int) round((float) ($lines[$item->id]['qty_received'] ?? 0));
+                $rejected = (int) round((float) ($lines[$item->id]['qty_rejected'] ?? 0));
 
-                if ($received == 0 && $rejected == 0) {
+                if ($received === 0 && $rejected === 0) {
                     continue;
                 }
                 if ($rejected > $received) {
@@ -116,14 +117,33 @@ class PurchaseService
                     'qty_rejected' => $rejected,
                 ]);
 
-                $accepted = $grItem->qtyAccepted();
+                $accepted = (int) round($grItem->qtyAccepted());
                 if ($accepted <= 0) {
                     continue;
                 }
 
-                $baseQty = round($accepted * (float) $item->conversion_factor, 4);
                 $product = $products[$item->productUnit->product_id];
-                $this->inventory->stockIn($product, $baseQty, $item->baseUnitCost(), 'purchase', $gr, $date);
+                $unitCode = strtoupper($item->productUnit->unit->code ?? '');
+                $factor = (int) round((float) $item->conversion_factor);
+
+                // Jika menerima satuan Roll (misal 3 Rol @ 50m), generate 3 baris SKU/Batch terpisah
+                if ($unitCode === 'ROLL' && $factor > 1) {
+                    for ($i = 0; $i < $accepted; $i++) {
+                        $this->inventory->createRollBatch(
+                            $product,
+                            $factor,
+                            $item->baseUnitCost(),
+                            'purchase',
+                            $gr,
+                            $date,
+                            $gr->id,
+                            $item->id,
+                        );
+                    }
+                } else {
+                    $baseQty = $accepted * max(1, $factor);
+                    $this->inventory->stockIn($product, $baseQty, $item->baseUnitCost(), 'purchase', $gr, $date);
+                }
 
                 $totalValue += $grItem->value($item);
             }
@@ -153,7 +173,7 @@ class PurchaseService
     {
         return DB::transaction(function () use ($po, $date, $lines, $reason) {
             $po = PurchaseOrder::whereKey($po->id)->lockForUpdate()->firstOrFail();
-            $po->load([...PurchaseOrder::SUMMARY_RELATIONS, 'items.productUnit.product']);
+            $po->load([...PurchaseOrder::SUMMARY_RELATIONS, 'items.productUnit.product', 'items.productUnit.unit']);
 
             $errors = [];
             $toProcess = [];
@@ -203,7 +223,24 @@ class PurchaseService
                 ]);
 
                 $product = $products[$item->productUnit->product_id];
+                $unitCode = strtoupper($item->productUnit->unit->code ?? '');
+                $factor = (int) round((float) $item->conversion_factor);
                 $baseQty = round($qty * (float) $item->conversion_factor, 4);
+
+                if ($unitCode === 'ROLL' && $factor > 1) {
+                    $rollsToReturn = (int) round($qty);
+                    $batches = ProductBatch::where('product_id', $product->id)
+                        ->where('remaining_qty', '>=', $factor)
+                        ->orderByDesc('id')
+                        ->lockForUpdate()
+                        ->limit($rollsToReturn)
+                        ->get();
+
+                    foreach ($batches as $batch) {
+                        $batch->decrement('remaining_qty', $factor);
+                    }
+                }
+
                 $residual += $this->inventory->stockOutAtCost($product, $baseQty, $item->baseUnitCost(), 'purchase_return', $return, $date);
 
                 $totalValue += $returnItem->value($item);

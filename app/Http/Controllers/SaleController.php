@@ -35,14 +35,14 @@ class SaleController extends Controller
 
     public function show(Sale $sale)
     {
-        $sale->load(['items.productUnit.product', 'items.productUnit.unit', 'cashier', 'voider', 'journals.lines.account']);
+        $sale->load(['items.productUnit.product', 'items.productUnit.unit', 'items.productBatch', 'cashier', 'voider', 'journals.lines.account']);
 
         return view('sales.show', compact('sale'));
     }
 
     public function invoice(Sale $sale)
     {
-        $sale->load(['items.productUnit.product', 'items.productUnit.unit', 'cashier']);
+        $sale->load(['items.productUnit.product', 'items.productUnit.unit', 'items.productBatch', 'cashier']);
 
         return view('sales.invoice', compact('sale'));
     }

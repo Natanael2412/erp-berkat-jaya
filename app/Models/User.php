@@ -19,8 +19,8 @@ class User extends Authenticatable
 
     public const ROLES = [
         'owner' => 'Owner',
-        'admin' => 'Admin Gudang',
-        'cashier' => 'Kasir',
+        'admin' => 'Admin Modul Persediaan',
+        'cashier' => 'Point of Sales (POS)',
     ];
 
     /**

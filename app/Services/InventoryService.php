@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\ProductBatch;
 use App\Models\StockMovement;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
@@ -11,7 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Mesin persediaan: metode HPP Rata-rata Bergerak (Moving Average) + kartu stok.
+ * Mesin persediaan: metode HPP Rata-rata Bergerak (Moving Average) + kartu stok + manajemen batch rol.
  *
  * Semua method mengasumsikan baris produk SUDAH di-lock lewat lockProducts()
  * di dalam DB::transaction() (pessimistic locking).
@@ -38,6 +39,52 @@ class InventoryService
     }
 
     /**
+     * Generate nomor SKU Batch unik untuk satu rol fisik (misal: KBL-NYM-2X15-ROL001).
+     */
+    public function nextBatchSku(Product $product): string
+    {
+        $prefix = $product->sku . '-ROL';
+        $count = ProductBatch::where('product_id', $product->id)->count();
+        $seq = $count + 1;
+
+        while (ProductBatch::where('batch_sku', sprintf('%s%03d', $prefix, $seq))->exists()) {
+            $seq++;
+        }
+
+        return sprintf('%s%03d', $prefix, $seq);
+    }
+
+    /**
+     * Buat entitas stok rol fisik terpisah (ProductBatch) dan catat mutasi masuk per rol.
+     */
+    public function createRollBatch(
+        Product $product,
+        int $qtyBase,
+        float $unitCost,
+        string $type,
+        ?Model $source,
+        CarbonInterface|string $date,
+        ?int $goodsReceiptId = null,
+        ?int $poItemId = null,
+    ): ProductBatch {
+        $batch = ProductBatch::create([
+            'product_id' => $product->id,
+            'goods_receipt_id' => $goodsReceiptId,
+            'purchase_order_item_id' => $poItemId,
+            'batch_sku' => $this->nextBatchSku($product),
+            'initial_qty' => $qtyBase,
+            'remaining_qty' => $qtyBase,
+            'unit_cost' => round($unitCost, 4),
+            'received_date' => $date instanceof CarbonInterface ? $date->toDateString() : substr((string) $date, 0, 10),
+            'is_active' => true,
+        ]);
+
+        $this->stockIn($product, $qtyBase, $unitCost, $type, $source, $date, $batch->id);
+
+        return $batch;
+    }
+
+    /**
      * Barang masuk. HPP baru = ((stok lama x HPP lama) + (qty masuk x biaya)) / (stok lama + qty masuk).
      */
     public function stockIn(
@@ -47,6 +94,7 @@ class InventoryService
         string $type,
         ?Model $source,
         CarbonInterface|string $date,
+        ?int $batchId = null,
     ): StockMovement {
         if ($qtyBase <= 0) {
             throw new \DomainException('Qty masuk harus lebih dari 0.');
@@ -60,7 +108,7 @@ class InventoryService
             ? round((($oldQty * $oldHpp) + ($qtyBase * $unitCost)) / $newQty, 4)
             : round($unitCost, 4);
 
-        return $this->apply($product, $newQty, $newHpp, $type, $source, $date, $qtyBase, 0, $unitCost);
+        return $this->apply($product, $newQty, $newHpp, $type, $source, $date, $qtyBase, 0, $unitCost, $batchId);
     }
 
     /**
@@ -74,13 +122,14 @@ class InventoryService
         string $type,
         ?Model $source,
         CarbonInterface|string $date,
+        ?int $batchId = null,
     ): float {
         $this->assertAvailable($product, $qtyBase);
 
         $hpp = (float) $product->current_hpp;
         $newQty = round((float) $product->current_stock - $qtyBase, 4);
 
-        $this->apply($product, $newQty, $hpp, $type, $source, $date, 0, $qtyBase, $hpp);
+        $this->apply($product, $newQty, $hpp, $type, $source, $date, 0, $qtyBase, $hpp, $batchId);
 
         return $hpp;
     }
@@ -99,6 +148,7 @@ class InventoryService
         string $type,
         ?Model $source,
         CarbonInterface|string $date,
+        ?int $batchId = null,
     ): float {
         $this->assertAvailable($product, $qtyBase);
 
@@ -110,7 +160,7 @@ class InventoryService
         $newHpp = $newQty > 0 ? round($targetValue / $newQty, 4) : 0;
         $residual = round($remainingValue - $targetValue, 2);
 
-        $this->apply($product, $newQty, $newHpp, $type, $source, $date, 0, $qtyBase, $unitCost);
+        $this->apply($product, $newQty, $newHpp, $type, $source, $date, 0, $qtyBase, $unitCost, $batchId);
 
         return abs($residual) < 0.01 ? 0.0 : $residual;
     }
@@ -140,6 +190,7 @@ class InventoryService
         float $qtyIn,
         float $qtyOut,
         float $unitCost,
+        ?int $batchId = null,
     ): StockMovement {
         $product->forceFill([
             'current_stock' => $newQty,
@@ -148,6 +199,7 @@ class InventoryService
 
         return StockMovement::create([
             'product_id' => $product->id,
+            'product_batch_id' => $batchId,
             'movement_date' => $date instanceof CarbonInterface ? $date : Carbon::parse($date)->setTimeFrom(now()),
             'type' => $type,
             'source_type' => $source?->getMorphClass(),

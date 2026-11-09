@@ -19,6 +19,6 @@ class Unit extends Model
 
     public function allowsDecimal(): bool
     {
-        return (bool) ($this->allows_decimal ?? in_array(strtoupper($this->code), ['M', 'METER', 'KG', 'L', 'LTR']));
+        return false;
     }
 }

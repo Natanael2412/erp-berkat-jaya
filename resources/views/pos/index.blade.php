@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>Kasir (POS) · Toko Listrik Berkat Jaya</title>
+        <title>Point of Sales (POS) · Toko Listrik Berkat Jaya</title>
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900&display=swap" rel="stylesheet" />
@@ -28,14 +28,14 @@
                     ⚡
                 </span>
                 <div>
-                    <h1 class="text-lg font-black tracking-tight leading-none text-white">POS · Berkat Jaya</h1>
-                    <span class="text-[11px] text-slate-400 font-medium">Kasir Toko Listrik & Instalasi</span>
+                    <h1 class="text-lg font-black tracking-tight leading-none text-white">Point of Sales (POS) · Berkat Jaya</h1>
+                    <span class="text-[11px] text-slate-400 font-medium">Point of Sales (POS) Toko Listrik & Instalasi</span>
                 </div>
             </div>
 
             <div class="flex items-center gap-4 text-xs font-semibold">
                 <div class="hidden sm:flex items-center gap-3 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
-                    <span class="text-slate-300">Kasir: <strong class="text-white">{{ auth()->user()->name }}</strong></span>
+                    <span class="text-slate-300">Point of Sales (POS): <strong class="text-white">{{ auth()->user()->name }}</strong></span>
                     <span class="text-slate-500">|</span>
                     <span class="text-emerald-400">Transaksi Hari Ini: <strong>{{ $todayCount ?? 0 }}</strong> ({{ rp($todayTotal ?? 0) }})</span>
                 </div>
@@ -61,7 +61,7 @@
                                x-ref="searchInput" 
                                x-model="searchQuery" 
                                @keydown.enter.prevent="handleBarcodeScan" 
-                               placeholder="[F4] Cari nama produk atau scan barcode SKU..." 
+                               placeholder="[F4] Cari nama produk, kode SKU, atau SKU Batch Rol..." 
                                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/20 transition">
                     </div>
                     <span class="text-xs text-slate-400 font-semibold hidden md:inline-block">
@@ -78,13 +78,22 @@
                             <div>
                                 <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
                                     <span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] group-hover:bg-teal-100 text-slate-700 transition" x-text="product.sku"></span>
-                                    <template x-if="product.base_allows_decimal">
-                                        <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                                            Meteran
-                                        </span>
+                                    <template x-if="product.has_rolls">
+                                        <span class="text-[10px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200" x-text="product.batches.length + ' Rol Fisik'"></span>
                                     </template>
                                 </div>
                                 <h3 class="font-bold text-slate-900 text-sm line-clamp-2 leading-snug group-hover:text-brand-teal transition" x-text="product.name"></h3>
+
+                                <template x-if="product.has_rolls && product.batches.length > 0">
+                                    <div class="mt-1.5 flex flex-wrap gap-1">
+                                        <template x-for="b in product.batches.slice(0, 3)" :key="b.id">
+                                            <span class="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded" x-text="b.batch_sku.split('-').pop() + ': ' + b.remaining_qty + product.base_unit_code"></span>
+                                        </template>
+                                        <template x-if="product.batches.length > 3">
+                                            <span class="text-[10px] text-slate-400" x-text="'+' + (product.batches.length - 3) + ' rol'"></span>
+                                        </template>
+                                    </div>
+                                </template>
                             </div>
 
                             <div class="mt-3 pt-2 border-t border-slate-100 flex items-end justify-between">
@@ -113,7 +122,7 @@
 
             </div>
 
-            {{-- Bagian Kanan: Keranjang Kasir & Pembayaran --}}
+            {{-- Bagian Kanan: Keranjang Point of Sales (POS) & Pembayaran --}}
             <div class="w-5/12 lg:w-4/12 bg-slate-50 flex flex-col justify-between h-full border-l border-slate-200 shadow-lg">
                 
                 {{-- Cart Header --}}
@@ -132,7 +141,7 @@
 
                 {{-- Cart Items List --}}
                 <div class="flex-1 overflow-y-auto p-3 space-y-2.5">
-                    <template x-for="(item, index) in cart" :key="item.product_id + '-' + item.product_unit_id">
+                    <template x-for="(item, index) in cart" :key="item.product_id + '-' + item.product_unit_id + '-' + (item.product_batch_id || '0')">
                         <div class="bg-white p-3 rounded-xl border border-slate-200/90 shadow-sm relative group">
                             
                             {{-- Remove Button --}}
@@ -148,6 +157,25 @@
                                 <div class="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1" x-text="item.name"></div>
                                 <div class="text-[11px] text-slate-400 font-mono mt-0.5" x-text="item.sku"></div>
                             </div>
+
+                            {{-- Pilihan Batch / Rol Fisik (Khusus Kabel Rol) --}}
+                            <template x-if="item.available_batches && item.available_batches.length > 0">
+                                <div class="mt-2 pt-2 border-t border-slate-100">
+                                    <label class="block text-[10px] font-bold uppercase tracking-wider text-teal-700 mb-1">
+                                        Pilih Rol Fisik (Batch SKU):
+                                    </label>
+                                    <select x-model.number="item.product_batch_id"
+                                            @change="onBatchChanged(item)"
+                                            class="w-full text-xs py-1 px-2 border border-teal-300 rounded-lg bg-teal-50/50 font-mono font-semibold text-teal-900 focus:ring-1 focus:ring-brand-teal focus:border-brand-teal">
+                                        <template x-for="b in item.available_batches" :key="b.id">
+                                            <option :value="b.id"
+                                                    :selected="b.id === item.product_batch_id"
+                                                    x-text="b.batch_sku + ' (Sisa: ' + b.remaining_qty + ' ' + item.base_unit + ')'">
+                                            </option>
+                                        </template>
+                                    </select>
+                                </div>
+                            </template>
 
                             {{-- Unit Dropdown & Pricing --}}
                             <div class="mt-2.5 flex items-center justify-between gap-2">
@@ -180,10 +208,10 @@
                             {{-- Qty Counter & Subtotal --}}
                             <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
                                 
-                                {{-- Qty Input Stepper --}}
+                                {{-- Qty Input Stepper (Selalu Bilangan Bulat / Integer) --}}
                                 <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-slate-50">
                                     <button type="button" 
-                                            @click="updateQty(index, item.allows_decimal ? -0.5 : -1)" 
+                                            @click="updateQty(index, -1)" 
                                             class="w-7 h-7 flex items-center justify-center font-bold text-slate-600 hover:bg-slate-200 transition">
                                         -
                                     </button>
@@ -191,21 +219,20 @@
                                     <input type="number" 
                                            x-model.number="item.qty" 
                                            @input="validateItemQty(item)" 
-                                           :step="item.allows_decimal ? '0.1' : '1'" 
-                                           :min="item.allows_decimal ? '0.1' : '1'" 
+                                           step="1" 
+                                           min="1" 
                                            class="w-16 h-7 text-center border-0 p-0 text-xs font-bold text-slate-900 bg-white focus:ring-0">
 
                                     <button type="button" 
-                                            @click="updateQty(index, item.allows_decimal ? 0.5 : 1)" 
+                                            @click="updateQty(index, 1)" 
                                             class="w-7 h-7 flex items-center justify-center font-bold text-slate-600 hover:bg-slate-200 transition">
                                         +
                                     </button>
                                 </div>
 
-                                {{-- Decimal badge notification --}}
+                                {{-- Unit Label --}}
                                 <div class="text-[11px] text-slate-400 font-medium">
                                     <span x-text="item.unit_name"></span>
-                                    <span x-show="item.allows_decimal" class="text-[10px] text-amber-600 font-semibold">(Pecahan)</span>
                                 </div>
 
                                 {{-- Subtotal --}}
@@ -335,7 +362,8 @@
                         const q = this.searchQuery.toLowerCase().trim();
                         return this.products.filter(p => 
                             (p.name && p.name.toLowerCase().includes(q)) || 
-                            (p.sku && p.sku.toLowerCase().includes(q))
+                            (p.sku && p.sku.toLowerCase().includes(q)) ||
+                            (p.batches && p.batches.some(b => b.batch_sku.toLowerCase().includes(q)))
                         );
                     },
 
@@ -343,6 +371,18 @@
                         if (!this.searchQuery || this.searchQuery.trim() === '') return;
                         const q = this.searchQuery.toLowerCase().trim();
                         
+                        // Cek apakah scan barcode adalah kode SKU Batch Rol spesifik
+                        for (const p of this.products) {
+                            if (p.batches && p.batches.length > 0) {
+                                const matchedBatch = p.batches.find(b => b.batch_sku.toLowerCase() === q);
+                                if (matchedBatch) {
+                                    this.addToCart(p, matchedBatch.id);
+                                    this.searchQuery = '';
+                                    return;
+                                }
+                            }
+                        }
+
                         const exactSku = this.products.find(p => p.sku && p.sku.toLowerCase() === q);
                         if (exactSku) {
                             this.addToCart(exactSku);
@@ -356,8 +396,7 @@
                         }
                     },
 
-                    addToCart(product) {
-                        // Cari default product_unit_id
+                    addToCart(product, preferredBatchId = null) {
                         const defaultUnitId = product.default_unit_id || (product.units && product.units[0] ? product.units[0].id : null);
                         const selectedUnit = product.units.find(u => u.id === defaultUnitId) || product.units[0];
 
@@ -366,25 +405,40 @@
                             return;
                         }
 
-                        // Cek apakah item dengan product_id & product_unit_id yang sama sudah ada di keranjang
-                        const existing = this.cart.find(i => i.product_id === product.id && i.product_unit_id === selectedUnit.id);
+                        const batches = product.batches || [];
+                        let chosenBatchId = preferredBatchId;
+                        if (!chosenBatchId && batches.length > 0) {
+                            chosenBatchId = batches[0].id;
+                        }
+
+                        const existing = this.cart.find(i => 
+                            i.product_id === product.id && 
+                            i.product_unit_id === selectedUnit.id &&
+                            i.product_batch_id === chosenBatchId
+                        );
                         
                         if (existing) {
-                            const addQty = existing.allows_decimal ? 1 : 1;
-                            existing.qty = Math.round((existing.qty + addQty) * 100) / 100;
+                            existing.qty = Math.round(existing.qty + 1);
+                            this.validateItemQty(existing);
                         } else {
-                            this.cart.push({
+                            const newItem = {
                                 product_id: product.id,
                                 product_unit_id: selectedUnit.id,
+                                product_batch_id: chosenBatchId,
                                 sku: product.sku,
                                 name: product.name,
+                                base_unit: product.base_unit,
                                 unit_name: selectedUnit.name,
-                                allows_decimal: !!selectedUnit.allows_decimal,
+                                factor: parseInt(selectedUnit.factor, 10) || 1,
+                                allows_decimal: false,
                                 price: parseFloat(selectedUnit.price) || 0,
                                 qty: 1,
-                                max_stock_base: parseFloat(product.stock) || 0,
-                                available_units: product.units || []
-                            });
+                                max_stock_base: parseInt(product.stock, 10) || 0,
+                                available_units: product.units || [],
+                                available_batches: batches
+                            };
+                            this.validateItemQty(newItem);
+                            this.cart.push(newItem);
                         }
                     },
 
@@ -392,24 +446,34 @@
                         const newUnit = item.available_units.find(u => u.id === item.product_unit_id);
                         if (newUnit) {
                             item.unit_name = newUnit.name;
+                            item.factor = parseInt(newUnit.factor, 10) || 1;
                             item.price = parseFloat(newUnit.price) || 0;
-                            item.allows_decimal = !!newUnit.allows_decimal;
+                            item.allows_decimal = false;
                             this.validateItemQty(item);
                         }
                     },
 
+                    onBatchChanged(item) {
+                        this.validateItemQty(item);
+                    },
+
                     validateItemQty(item) {
-                        let val = parseFloat(item.qty);
-                        if (isNaN(val) || val <= 0) {
-                            val = item.allows_decimal ? 0.1 : 1;
+                        let val = Math.round(parseFloat(item.qty));
+                        if (isNaN(val) || val < 1) {
+                            val = 1;
                         }
 
-                        // KETAT: Jika satuan TIDAK mengizinkan desimal (e.g. Pcs, Box, Dus, Batang), bulatkan ke integer!
-                        if (!item.allows_decimal) {
-                            val = Math.max(1, Math.round(val));
-                        } else {
-                            // Untuk satuan desimal (e.g. Meter), izinkan hingga 2 tempat desimal
-                            val = Math.round(val * 100) / 100;
+                        // Jika memilih rol fisik spesifik, pastikan kuantitas tidak melebihi sisa meteran pada rol tersebut
+                        if (item.product_batch_id && item.available_batches && item.available_batches.length > 0) {
+                            const batch = item.available_batches.find(b => b.id === item.product_batch_id);
+                            if (batch) {
+                                const factor = parseInt(item.factor, 10) || 1;
+                                const maxAllowedInUnit = Math.floor(batch.remaining_qty / factor);
+                                if (maxAllowedInUnit >= 1 && val > maxAllowedInUnit) {
+                                    alert(`Stok pada rol ${batch.batch_sku} hanya tersisa ${batch.remaining_qty} ${item.base_unit}. Tidak boleh memotong melebihi sisa rol fisik ini.`);
+                                    val = maxAllowedInUnit;
+                                }
+                            }
                         }
 
                         item.qty = val;
@@ -419,15 +483,11 @@
                         const item = this.cart[index];
                         if (!item) return;
 
-                        let newQty = parseFloat(item.qty) + delta;
-                        if (!item.allows_decimal) {
-                            newQty = Math.round(newQty);
-                        } else {
-                            newQty = Math.round(newQty * 100) / 100;
-                        }
+                        let newQty = Math.round(parseFloat(item.qty) + delta);
 
                         if (newQty > 0) {
                             item.qty = newQty;
+                            this.validateItemQty(item);
                         } else {
                             this.removeFromCart(index);
                         }
@@ -439,7 +499,7 @@
 
                     get totalAmount() {
                         return this.cart.reduce((total, item) => {
-                            const q = parseFloat(item.qty) || 0;
+                            const q = parseInt(item.qty, 10) || 0;
                             const p = parseFloat(item.price) || 0;
                             return total + Math.round(q * p);
                         }, 0);
@@ -457,13 +517,10 @@
                         return Math.round(num).toLocaleString('id-ID');
                     },
 
-                    formatQty(val, allowsDecimal) {
-                        const num = parseFloat(val);
+                    formatQty(val) {
+                        const num = parseInt(val, 10);
                         if (isNaN(num)) return '0';
-                        if (!allowsDecimal || Math.floor(num) === num) {
-                            return Math.floor(num).toLocaleString('id-ID');
-                        }
-                        return num.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                        return num.toLocaleString('id-ID');
                     },
 
                     async checkout() {
@@ -487,7 +544,8 @@
                                 amount_paid: this.paymentMethod === 'cash' ? this.amountPaid : this.totalAmount,
                                 cart: this.cart.map(item => ({
                                     product_unit_id: item.product_unit_id,
-                                    qty: item.qty
+                                    product_batch_id: item.product_batch_id || null,
+                                    qty: Math.round(item.qty)
                                 }))
                             };
 

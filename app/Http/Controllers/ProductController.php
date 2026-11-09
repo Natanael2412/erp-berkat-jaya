@@ -14,7 +14,7 @@ class ProductController extends Controller
 
     public function index(Request $request)
     {
-        $products = Product::with(['baseUnit', 'units.unit'])
+        $products = Product::with(['baseUnit', 'units.unit', 'availableBatches'])
             ->when($request->q, fn ($q, $s) => $q->where(fn ($w) => $w->where('name', 'like', "%{$s}%")->orWhere('sku', 'like', "%{$s}%")))
             ->when($request->filter === 'low', fn ($q) => $q->whereColumn('current_stock', '<=', 'min_stock'))
             ->when($request->filter === 'inactive', fn ($q) => $q->where('is_active', false), fn ($q) => $q->where('is_active', true))
@@ -42,8 +42,8 @@ class ProductController extends Controller
 
     public function show(Product $product)
     {
-        $product->load(['baseUnit', 'units.unit']);
-        $movements = $product->stockMovements()->with('source')->latest('id')->paginate(25);
+        $product->load(['baseUnit', 'units.unit', 'batches.goodsReceipt.purchaseOrder']);
+        $movements = $product->stockMovements()->with(['source', 'batch'])->latest('id')->paginate(25);
 
         return view('products.show', compact('product', 'movements'));
     }
@@ -73,18 +73,18 @@ class ProductController extends Controller
         $rules = [
             'sku' => ['required', 'string', 'max:50', Rule::unique('products', 'sku')->ignore($product?->id)],
             'name' => ['required', 'string', 'max:150'],
-            'min_stock' => ['nullable', 'numeric', 'min:0'],
+            'min_stock' => ['nullable', 'integer', 'min:0'],
             'base_selling_price' => ['required', 'numeric', 'min:0'],
             'units' => ['array'],
             'units.*.unit_id' => ['required', 'distinct', 'exists:units,id', Rule::notIn([$baseUnitId])],
-            'units.*.conversion_factor' => ['required', 'numeric', 'gt:1'],
+            'units.*.conversion_factor' => ['required', 'integer', 'gt:1'],
             'units.*.selling_price' => ['required', 'numeric', 'min:0'],
         ];
 
         if (! $product) {
             $rules += [
                 'base_unit_id' => ['required', 'exists:units,id'],
-                'opening_qty' => ['nullable', 'numeric', 'min:0'],
+                'opening_qty' => ['nullable', 'integer', 'min:0'],
                 'opening_cost' => ['required_with:opening_qty', 'nullable', 'numeric', 'min:0'],
                 'opening_date' => ['nullable', 'date', 'before_or_equal:today'],
             ];

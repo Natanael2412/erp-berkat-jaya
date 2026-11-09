@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class SaleItem extends Model
 {
-    protected $fillable = ['sale_id', 'product_unit_id', 'conversion_factor', 'qty', 'unit_price', 'hpp_at_sale'];
+    protected $fillable = ['sale_id', 'product_unit_id', 'product_batch_id', 'conversion_factor', 'qty', 'unit_price', 'hpp_at_sale'];
 
     protected $casts = [
         'conversion_factor' => 'decimal:4',
@@ -23,6 +23,11 @@ class SaleItem extends Model
     public function productUnit()
     {
         return $this->belongsTo(ProductUnit::class);
+    }
+
+    public function productBatch()
+    {
+        return $this->belongsTo(ProductBatch::class);
     }
 
     public function subtotal(): float

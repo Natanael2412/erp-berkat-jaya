@@ -88,11 +88,13 @@ class AccountingIntegrityTest extends TestCase
         ]);
         $item = $po->items()->first();
 
-        // 2 roll x 50 m = 100 m @ Rp 6.000/m.
+        // 2 roll x 50 m = 100 m @ Rp 6.000/m -> otomatis membuat 2 baris batch rol terpisah (plus 2 dari saldo awal 100m).
         $purchases->receive($po, today()->toDateString(), [$item->id => ['qty_received' => 2, 'qty_rejected' => 0]]);
 
         $product->refresh();
         $this->assertEqualsWithDelta(200, (float) $product->current_stock, 0.0001);
+        $this->assertEquals(4, $product->batches()->count(), '2 rol saldo awal + 2 rol dari PO harus menjadi 4 batch rol terpisah');
+        $this->assertEquals(2, $product->batches()->whereNotNull('goods_receipt_id')->count(), 'Inbound 2 Rol harus men-generate 2 baris SKU/Batch terpisah');
         // ((100 x 5000) + (100 x 6000)) / 200 = 5500
         $this->assertEqualsWithDelta(5500, (float) $product->current_hpp, 0.0001);
         $this->assertEquals('completed', $po->fresh()->status);

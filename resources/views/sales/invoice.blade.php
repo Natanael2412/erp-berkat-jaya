@@ -87,12 +87,17 @@
                         <td class="py-3 px-3 text-center text-slate-500">{{ $index + 1 }}</td>
                         <td class="py-3 px-3">
                             <div class="font-bold text-gunmetal">{{ $item->productUnit->product->name }}</div>
-                            <div class="text-xs text-slate-500">SKU: {{ $item->productUnit->product->sku }}</div>
+                            <div class="text-xs text-slate-500">
+                                SKU: {{ $item->productUnit->product->sku }}
+                                @if($item->productBatch)
+                                    · Batch: {{ $item->productBatch->batch_sku }}
+                                @endif
+                            </div>
                         </td>
                         <td class="py-3 px-3 text-center font-bold">
-                            {{ $item->qty + 0 }} <span class="text-xs text-slate-500 font-normal">{{ $item->productUnit->unit->name }}</span>
+                            {{ (int) round($item->qty) }} <span class="text-xs text-slate-500 font-normal">{{ $item->productUnit->unit->name }}</span>
                         </td>
-                        <td class="py-3 px-3 text-right">Rp {{ number_format($item->selling_price, 0, ',', '.') }}</td>
+                        <td class="py-3 px-3 text-right">Rp {{ number_format($item->unit_price, 0, ',', '.') }}</td>
                         <td class="py-3 px-3 text-right font-bold text-gunmetal">Rp {{ number_format($item->subtotal(), 0, ',', '.') }}</td>
                     </tr>
                 @endforeach

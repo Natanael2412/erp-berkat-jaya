@@ -64,9 +64,9 @@
                     </div>
                     <div>
                         <label class="label" for="min_stock">Stok Minimum</label>
-                        <input id="min_stock" type="number" step="0.0001" min="0" name="min_stock" value="{{ old('min_stock', (float) $product->min_stock) }}" class="input num text-left">
+                        <input id="min_stock" type="number" step="1" min="0" name="min_stock" value="{{ old('min_stock', (int) round((float) $product->min_stock)) }}" class="input num text-left">
                         @error('min_stock') <p class="input-error">{{ $message }}</p> @enderror
-                        <p class="hint">Peringatan muncul bila stok &le; angka ini (dalam satuan dasar).</p>
+                        <p class="hint">Peringatan muncul bila stok &le; angka ini (dalam satuan dasar, bilangan bulat).</p>
                     </div>
                     <div class="md:col-span-2">
                         <label class="label" for="base_selling_price">Harga Jual per Satuan Dasar (Rp) <span class="text-red-500">*</span></label>
@@ -96,7 +96,7 @@
                             </div>
                             <div class="md:col-span-3">
                                 <label class="label">Isi (satuan dasar)</label>
-                                <input type="number" step="0.0001" min="1.0001" :name="`units[${i}][conversion_factor]`" x-model="row.conversion_factor" class="input" required>
+                                <input type="number" step="1" min="2" :name="`units[${i}][conversion_factor]`" x-model="row.conversion_factor" class="input" required>
                             </div>
                             <div class="md:col-span-4">
                                 <label class="label">Harga Jual (Rp)</label>
@@ -126,7 +126,7 @@
                     <div class="card-body space-y-4">
                         <div>
                             <label class="label" for="opening_qty">Qty Stok Awal</label>
-                            <input id="opening_qty" type="number" step="0.0001" min="0" name="opening_qty" value="{{ old('opening_qty') }}" class="input">
+                            <input id="opening_qty" type="number" step="1" min="0" name="opening_qty" value="{{ old('opening_qty') }}" class="input">
                             @error('opening_qty') <p class="input-error">{{ $message }}</p> @enderror
                         </div>
                         <div>

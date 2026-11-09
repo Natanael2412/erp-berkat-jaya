@@ -122,9 +122,25 @@
                             </div>
                             <ul class="mt-2 space-y-1 text-sm">
                                 @foreach ($gr->items as $gi)
-                                    <li class="flex justify-between gap-3">
-                                        <span>{{ $gi->purchaseOrderItem->productUnit->product->name }}</span>
-                                        <span class="num">+{{ num($gi->qtyAccepted()) }} @if ((float) $gi->qty_rejected > 0)<span class="text-red-600">(tolak {{ num($gi->qty_rejected) }})</span>@endif</span>
+                                    @php
+                                        $grBatches = $gi->purchaseOrderItem->productUnit->product->batches
+                                            ->where('goods_receipt_id', $gr->id)
+                                            ->where('purchase_order_item_id', $gi->purchase_order_item_id);
+                                    @endphp
+                                    <li class="space-y-1">
+                                        <div class="flex justify-between gap-3">
+                                            <span>{{ $gi->purchaseOrderItem->productUnit->product->name }}</span>
+                                            <span class="num">+{{ num($gi->qtyAccepted(), 0) }} {{ $gi->purchaseOrderItem->productUnit->unit->name }} @if ((float) $gi->qty_rejected > 0)<span class="text-red-600">(tolak {{ num($gi->qty_rejected, 0) }})</span>@endif</span>
+                                        </div>
+                                        @if ($grBatches->isNotEmpty())
+                                            <div class="flex flex-wrap gap-1 pl-2">
+                                                @foreach ($grBatches as $b)
+                                                    <span class="rounded bg-teal-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-teal-700 border border-teal-200">
+                                                        {{ $b->batch_sku }} ({{ $b->initial_qty }} {{ $gi->purchaseOrderItem->productUnit->product->baseUnit->name ?? 'M' }}, sisa: {{ $b->remaining_qty }})
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @endif
                                     </li>
                                 @endforeach
                             </ul>

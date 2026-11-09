@@ -16,22 +16,30 @@ class PosController extends Controller
     public function index()
     {
         $products = Product::where('is_active', true)
-            ->with(['activeUnits.unit', 'baseUnit'])
+            ->with(['activeUnits.unit', 'baseUnit', 'availableBatches'])
             ->orderBy('name')
             ->get()
             ->map(function ($p) {
                 $baseUnitId = $p->base_unit_id;
                 $baseProductUnit = $p->activeUnits->firstWhere('unit_id', $baseUnitId) ?? $p->activeUnits->first();
+                $hasRolls = $p->activeUnits->contains(fn ($u) => strtoupper($u->unit->code ?? '') === 'ROLL') && $p->availableBatches->isNotEmpty();
 
                 return [
                     'id' => $p->id,
                     'sku' => $p->sku,
                     'name' => $p->name,
-                    'stock' => (float) $p->current_stock,
-                    'formatted_stock' => num($p->current_stock),
+                    'stock' => (int) round((float) $p->current_stock),
+                    'formatted_stock' => num($p->current_stock, 0),
                     'base_unit' => $p->baseUnit?->name ?? 'Pcs',
                     'base_unit_code' => $p->baseUnit?->code ?? 'PCS',
-                    'base_allows_decimal' => (bool) ($p->baseUnit?->allowsDecimal() ?? false),
+                    'base_allows_decimal' => false,
+                    'has_rolls' => $hasRolls,
+                    'batches' => $p->availableBatches->map(fn ($b) => [
+                        'id' => $b->id,
+                        'batch_sku' => $b->batch_sku,
+                        'initial_qty' => (int) $b->initial_qty,
+                        'remaining_qty' => (int) $b->remaining_qty,
+                    ])->values(),
                     'default_unit_id' => $baseProductUnit?->id,
                     'default_price' => (float) ($baseProductUnit?->selling_price ?? 0),
                     'units' => $p->activeUnits->map(fn ($u) => [
@@ -39,10 +47,10 @@ class PosController extends Controller
                         'unit_id' => $u->unit_id,
                         'name' => $u->unit->name,
                         'code' => $u->unit->code,
-                        'factor' => (float) $u->conversion_factor,
+                        'factor' => (int) round((float) $u->conversion_factor),
                         'price' => (float) $u->selling_price,
                         'formatted_price' => rp($u->selling_price),
-                        'allows_decimal' => (bool) $u->unit->allowsDecimal(),
+                        'allows_decimal' => false,
                     ])->values(),
                 ];
             });
@@ -70,6 +78,7 @@ class PosController extends Controller
             'amount_paid' => ['nullable', 'numeric', 'min:0'],
             'cart' => ['required', 'array', 'min:1', 'max:100'],
             'cart.*.product_unit_id' => ['required', 'integer', 'exists:product_units,id'],
+            'cart.*.product_batch_id' => ['nullable', 'integer', 'exists:product_batches,id'],
             'cart.*.qty' => ['required', 'numeric', 'gt:0', 'max:100000'],
         ], ['cart.required' => 'Keranjang masih kosong.']);
 
@@ -97,7 +106,7 @@ class PosController extends Controller
             abort(403);
         }
 
-        $sale->load(['items.productUnit.product', 'items.productUnit.unit', 'cashier']);
+        $sale->load(['items.productUnit.product', 'items.productUnit.unit', 'items.productBatch', 'cashier']);
 
         return view('pos.receipt', compact('sale'));
     }

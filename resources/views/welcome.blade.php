@@ -554,7 +554,7 @@
                 {{-- Col 5: Portal Staff --}}
                 <div class="space-y-3">
                     <h4 class="text-xs font-bold text-white uppercase tracking-wider">Internal Staff</h4>
-                    <p class="text-xs text-slate-400">Akses khusus kasir, admin gudang, dan owner toko.</p>
+                    <p class="text-xs text-slate-400">Akses khusus Point of Sales (POS), admin Modul Persediaan, dan owner toko.</p>
                     <div class="pt-1">
                         @auth
                             <a href="{{ auth()->user()->homeRoute() }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 hover:text-white hover:bg-emerald-600 text-xs font-semibold transition">

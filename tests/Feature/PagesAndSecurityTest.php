@@ -84,45 +84,90 @@ class PagesAndSecurityTest extends TestCase
 
         $response = $this->get(route('pos.index'));
         $response->assertOk();
-        $response->assertSee('POS · Berkat Jaya');
+        $response->assertSee('Point of Sales (POS) · Berkat Jaya');
         $response->assertSee('default_price');
-        $response->assertSee('allows_decimal');
+        $response->assertSee('batches');
     }
 
-    public function test_pos_allows_decimal_for_meter_and_rejects_for_pcs(): void
+    public function test_pos_enforces_integer_quantities_and_prevents_cross_roll_cutting(): void
     {
         $this->seed(DemoSeeder::class);
+        $owner = User::where('role', 'owner')->first();
+        $this->actingAs($owner);
+
+        $u = Unit::pluck('id', 'code');
+        $kabel = app(\App\Services\ProductService::class)->create([
+            'sku' => 'KBL-ROL-TEST',
+            'name' => 'Kabel Tes Rol Fisik',
+            'base_unit_id' => $u['M'],
+            'min_stock' => 10,
+            'base_selling_price' => 10000,
+            'units' => [['unit_id' => $u['ROLL'], 'conversion_factor' => 50, 'selling_price' => 450000]],
+        ]);
+        $rollUnit = $kabel->units()->where('unit_id', $u['ROLL'])->first();
+        $meterUnit = $kabel->units()->where('unit_id', $u['M'])->first();
+
+        // Buat PO 3 Rol @ 50m dan terima penuh (Inbound PO Komplit)
+        $purchases = app(\App\Services\PurchaseService::class);
+        $po = $purchases->createOrder([
+            'supplier_id' => \App\Models\Supplier::first()->id,
+            'order_date' => today()->toDateString(),
+            'items' => [['product_unit_id' => $rollUnit->id, 'qty_ordered' => 3, 'unit_price' => 350000]],
+        ]);
+        $poItem = $po->items()->first();
+
+        $this->post(route('purchase-orders.receive', $po), [
+            'receipt_date' => today()->toDateString(),
+            'items' => [
+                $poItem->id => ['qty_received' => 3, 'qty_rejected' => 0],
+            ],
+        ])->assertRedirect(route('purchase-orders.show', $po));
+
+        // Pastikan 3 Rol men-generate 3 baris SKU/Batch terpisah masing-masing 50 meter
+        $batches = \App\Models\ProductBatch::where('product_id', $kabel->id)->orderBy('id')->get();
+        $this->assertCount(3, $batches);
+        foreach ($batches as $b) {
+            $this->assertEquals(50, $b->initial_qty);
+            $this->assertEquals(50, $b->remaining_qty);
+        }
+
         $cashier = User::where('role', 'cashier')->first();
         $this->actingAs($cashier);
 
-        $kabel = Product::where('sku', 'KBL-NYM-2X15')->first();
-        $meterUnit = $kabel->units()->where('unit_id', Unit::where('code', 'M')->value('id'))->first();
-
-        $lampu = Product::where('sku', 'LMP-LED-12W')->first();
-        $pcsUnit = $lampu->units()->where('unit_id', Unit::where('code', 'PCS')->value('id'))->first();
-
-        // 1. Kabel dengan satuan Meter boleh desimal (e.g. 2.5 meter)
-        $resMeter = $this->postJson(route('pos.checkout'), [
+        // 1. Kuantitas pecahan/desimal harus ditolak (bahkan untuk satuan Meter)
+        $resDecimal = $this->postJson(route('pos.checkout'), [
             'payment_method' => 'cash',
             'amount_paid' => 100000,
             'cart' => [
-                ['product_unit_id' => $meterUnit->id, 'qty' => 2.5],
+                ['product_unit_id' => $meterUnit->id, 'product_batch_id' => $batches[0]->id, 'qty' => 2.5],
             ],
         ]);
-        $resMeter->assertOk();
-        $this->assertDatabaseHas('sales', ['payment_method' => 'cash']);
+        $resDecimal->assertStatus(422);
 
-        // 2. Lampu dengan satuan Pcs TIDAK boleh desimal (e.g. 1.5 Pcs)
-        $resPcs = $this->postJson(route('pos.checkout'), [
+        // 2. Potong 25m dari Rol #1 dan 25m dari Rol #2, serta habiskan 50m dari Rol #3
+        $this->postJson(route('pos.checkout'), [
             'payment_method' => 'cash',
-            'amount_paid' => 100000,
+            'amount_paid' => 2000000,
             'cart' => [
-                ['product_unit_id' => $pcsUnit->id, 'qty' => 1.5],
+                ['product_unit_id' => $meterUnit->id, 'product_batch_id' => $batches[0]->id, 'qty' => 25],
+                ['product_unit_id' => $meterUnit->id, 'product_batch_id' => $batches[1]->id, 'qty' => 25],
+                ['product_unit_id' => $meterUnit->id, 'product_batch_id' => $batches[2]->id, 'qty' => 50],
+            ],
+        ])->assertOk();
+
+        $this->assertEquals(25, $batches[0]->fresh()->remaining_qty);
+        $this->assertEquals(25, $batches[1]->fresh()->remaining_qty);
+        $this->assertEquals(0, $batches[2]->fresh()->remaining_qty);
+        $this->assertEquals(50, (int) $kabel->fresh()->current_stock);
+
+        // 3. Pelanggan ingin membeli 50m utuh padahal stok fisik tersisa 2 rol @ 25m -> HARUS DITOLAK!
+        $resCrossRoll = $this->postJson(route('pos.checkout'), [
+            'payment_method' => 'cash',
+            'amount_paid' => 1000000,
+            'cart' => [
+                ['product_unit_id' => $meterUnit->id, 'product_batch_id' => $batches[0]->id, 'qty' => 50],
             ],
         ]);
-        $resPcs->assertStatus(422);
-        $resPcs->assertJsonFragment([
-            'message' => "Satuan Pcs ({$lampu->name}) tidak boleh berupa pecahan/desimal. Harus bilangan bulat.",
-        ]);
+        $resCrossRoll->assertStatus(422);
     }
 }

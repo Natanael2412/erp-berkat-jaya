@@ -39,7 +39,7 @@
 
             <div class="side-group">Transaksi</div>
             @if ($user->hasRole('owner', 'cashier'))
-                <x-side-link :href="route('pos.index')" :active="$is('pos.*')" icon="pos">POS Kasir</x-side-link>
+                <x-side-link :href="route('pos.index')" :active="$is('pos.*')" icon="pos">Point of Sales (POS)</x-side-link>
             @endif
             @if ($user->hasRole('owner', 'admin'))
                 <x-side-link :href="route('sales.index')" :active="$is('sales.*')" icon="receipt">Riwayat Penjualan</x-side-link>
@@ -50,7 +50,7 @@
             @endif
 
             @if ($user->hasRole('owner', 'admin'))
-                <div class="side-group">Master Data</div>
+                <div class="side-group">Modul Persediaan</div>
                 <x-side-link :href="route('products.index')" :active="$is('products.*')" icon="box">Produk & Stok</x-side-link>
                 <x-side-link :href="route('units.index')" :active="$is('units.*')" icon="ruler">Satuan</x-side-link>
                 <x-side-link :href="route('suppliers.index')" :active="$is('suppliers.*')" icon="factory">Supplier</x-side-link>

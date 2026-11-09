@@ -68,7 +68,7 @@
                 <td>: {{ \Carbon\Carbon::parse($sale->sale_date)->format('d/m/y H:i') }}</td>
             </tr>
             <tr>
-                <td>Kasir</td>
+                <td>Point of Sales (POS)</td>
                 <td>: {{ mb_substr($sale->cashier->name, 0, 15) }}</td>
             </tr>
             <tr>
@@ -82,11 +82,16 @@
         <table>
             @foreach($sale->items as $item)
             <tr>
-                <td colspan="3" class="font-bold">{{ mb_substr($item->productUnit->product->name, 0, 30) }}</td>
+                <td colspan="3" class="font-bold">
+                    {{ mb_substr($item->productUnit->product->name, 0, 30) }}
+                    @if($item->productBatch)
+                        <div style="font-size: 10px; font-weight: normal;">[{{ $item->productBatch->batch_sku }}]</div>
+                    @endif
+                </td>
             </tr>
             <tr>
-                <td>{{ $item->qty + 0 }} {{ $item->productUnit->unit->name }}</td>
-                <td class="text-right">x {{ number_format($item->selling_price, 0, ',', '.') }}</td>
+                <td>{{ (int) round($item->qty) }} {{ $item->productUnit->unit->name }}</td>
+                <td class="text-right">x {{ number_format($item->unit_price, 0, ',', '.') }}</td>
                 <td class="text-right">{{ number_format($item->subtotal(), 0, ',', '.') }}</td>
             </tr>
             @endforeach

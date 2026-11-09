@@ -22,7 +22,7 @@
                         {{ __('Pembelian / PO') }}
                     </x-nav-link>
                     <x-nav-link :href="route('pos.index')" :active="request()->routeIs('pos.*')">
-                        {{ __('POS Kasir') }}
+                        {{ __('Point of Sales (POS)') }}
                     </x-nav-link>
                 </div>
             </div>
@@ -86,7 +86,7 @@
                 {{ __('Pembelian / PO') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('pos.index')" :active="request()->routeIs('pos.*')">
-                {{ __('POS Kasir') }}
+                {{ __('Point of Sales (POS)') }}
             </x-responsive-nav-link>
         </div>
 

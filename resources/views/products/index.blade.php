@@ -2,8 +2,8 @@
     <x-slot name="header">
         <div class="flex w-full items-center justify-between gap-3">
             <div>
-                <h2 class="page-title">Produk &amp; Stok</h2>
-                <p class="page-subtitle">Master barang, stok terkini, dan HPP rata-rata bergerak.</p>
+                <h2 class="page-title">Modul Persediaan · Produk &amp; Stok</h2>
+                <p class="page-subtitle">Master barang, stok terkini, batch rol fisik, dan HPP rata-rata bergerak.</p>
             </div>
             <a href="{{ route('products.create') }}" class="btn btn-primary" id="btn-add-product">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
@@ -68,12 +68,21 @@
                                 </div>
                             </td>
                             <td class="num font-bold {{ $product->isLowStock() ? 'text-red-600' : '' }}">
-                                {{ num($product->current_stock) }} <span class="text-xs font-medium text-slate-500">{{ $product->baseUnit->name }}</span>
+                                {{ num($product->current_stock, 0) }} <span class="text-xs font-medium text-slate-500">{{ $product->baseUnit->name }}</span>
                                 @if ($product->isLowStock())
                                     <span class="badge badge-red ml-1">Menipis</span>
                                 @endif
+                                @if ($product->availableBatches->isNotEmpty())
+                                    <div class="mt-1 flex flex-wrap justify-end gap-1">
+                                        @foreach ($product->availableBatches as $batch)
+                                            <span class="inline-block rounded bg-teal-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-teal-700 border border-teal-200" title="Batch Rol {{ $batch->batch_sku }}">
+                                                {{ $batch->batch_sku }}: {{ $batch->remaining_qty }} {{ $product->baseUnit->name }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </td>
-                            <td class="num text-slate-500">{{ num($product->min_stock) }}</td>
+                            <td class="num text-slate-500">{{ num($product->min_stock, 0) }}</td>
                             <td class="num">{{ rp($product->current_hpp) }}</td>
                             <td class="num font-semibold">{{ rp($product->stockValue()) }}</td>
                             <td class="space-x-3 whitespace-nowrap text-right">

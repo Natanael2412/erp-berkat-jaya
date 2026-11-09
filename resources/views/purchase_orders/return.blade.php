@@ -38,7 +38,7 @@
                                 <td class="num font-bold">{{ num($returnable) }} <span class="text-xs font-medium text-slate-500">{{ $item->productUnit->unit->name }}</span></td>
                                 <td class="bg-orange-50/60">
                                     @if ($returnable > 0)
-                                        <input type="number" step="0.0001" min="0" max="{{ $returnable }}" name="items[{{ $item->id }}]"
+                                        <input type="number" step="1" min="0" max="{{ (int) round($returnable) }}" name="items[{{ $item->id }}]"
                                                value="{{ old("items.{$item->id}", 0) }}" class="input num w-28 text-right">
                                     @else
                                         <span class="block text-center text-slate-300">—</span>

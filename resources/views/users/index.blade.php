@@ -3,7 +3,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h2 class="page-title">Manajemen Pengguna</h2>
-                <p class="page-subtitle">Kelola akses pengguna, kasir, admin, dan hak akses.</p>
+                <p class="page-subtitle">Kelola akses pengguna, Point of Sales (POS), admin Modul Persediaan, dan hak akses.</p>
             </div>
             <a href="{{ route('users.create') }}" class="btn btn-primary inline-flex">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>

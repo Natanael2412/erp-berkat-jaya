@@ -56,11 +56,12 @@ class PurchaseOrderController extends Controller
             'notes' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_unit_id' => ['required', 'distinct', 'exists:product_units,id'],
-            'items.*.qty_ordered' => ['required', 'numeric', 'gt:0'],
+            'items.*.qty_ordered' => ['required', 'integer', 'gt:0'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ], [
             'items.required' => 'Tambahkan minimal satu barang.',
             'items.*.product_unit_id.distinct' => 'Produk dengan satuan yang sama tidak boleh dimasukkan dua kali.',
+            'items.*.qty_ordered.integer' => 'Kuantitas barang harus berupa bilangan bulat (Integer).',
         ]);
 
         $po = $this->service->createOrder($data);
@@ -72,7 +73,7 @@ class PurchaseOrderController extends Controller
     {
         $purchaseOrder->load([
             'supplier', 'creator',
-            'items.productUnit.product', 'items.productUnit.unit',
+            'items.productUnit.product.batches', 'items.productUnit.unit',
             ...PurchaseOrder::SUMMARY_RELATIONS,
             'receipts.items.purchaseOrderItem.productUnit.product', 'receipts.receiver', 'receipts.journal',
             'returns.items.purchaseOrderItem.productUnit.product', 'returns.journal',
@@ -101,14 +102,17 @@ class PurchaseOrderController extends Controller
             'receipt_date' => ['required', 'date', 'before_or_equal:today', 'after_or_equal:' . $purchaseOrder->order_date->toDateString()],
             'notes' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array'],
-            'items.*.qty_received' => ['nullable', 'numeric', 'min:0'],
-            'items.*.qty_rejected' => ['nullable', 'numeric', 'min:0'],
+            'items.*.qty_received' => ['nullable', 'integer', 'min:0'],
+            'items.*.qty_rejected' => ['nullable', 'integer', 'min:0'],
+        ], [
+            'items.*.qty_received.integer' => 'Kuantitas barang diterima harus berupa bilangan bulat (Integer).',
+            'items.*.qty_rejected.integer' => 'Kuantitas barang ditolak harus berupa bilangan bulat (Integer).',
         ]);
 
         $gr = $this->service->receive($purchaseOrder, $data['receipt_date'], $data['items'], $data['notes'] ?? null);
 
         return redirect()->route('purchase-orders.show', $purchaseOrder)
-            ->with('success', "Penerimaan {$gr->gr_number} disimpan. Stok, HPP, dan jurnal telah diperbarui.");
+            ->with('success', "Penerimaan {$gr->gr_number} disimpan. Stok (beserta batch rol fisik), HPP, dan jurnal telah diperbarui.");
     }
 
     public function returnForm(PurchaseOrder $purchaseOrder)
@@ -128,7 +132,9 @@ class PurchaseOrderController extends Controller
             'return_date' => ['required', 'date', 'before_or_equal:today'],
             'reason' => ['required', 'string', 'max:255'],
             'items' => ['required', 'array'],
-            'items.*' => ['nullable', 'numeric', 'min:0'],
+            'items.*' => ['nullable', 'integer', 'min:0'],
+        ], [
+            'items.*.integer' => 'Kuantitas retur harus berupa bilangan bulat (Integer).',
         ]);
 
         $return = $this->service->returnGoods($purchaseOrder, $data['return_date'], $data['items'], $data['reason']);

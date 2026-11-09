@@ -49,7 +49,7 @@
                                 {{ $pu->unit->name }}
                                 @if ($pu->unit_id === $product->base_unit_id) <span class="badge badge-teal ml-1">Dasar</span> @endif
                             </td>
-                            <td class="num">{{ num($pu->conversion_factor) }} {{ $product->baseUnit->name }}</td>
+                            <td class="num">{{ num($pu->conversion_factor, 0) }} {{ $product->baseUnit->name }}</td>
                             <td class="num">{{ rp($pu->selling_price) }}</td>
                             <td class="text-center">
                                 <span class="badge {{ $pu->is_active ? 'badge-green' : 'badge-gray' }}">{{ $pu->is_active ? 'Aktif' : 'Nonaktif' }}</span>
@@ -61,6 +61,61 @@
         </div>
     </div>
 
+    @if ($product->batches->isNotEmpty())
+        <div class="mb-6 card">
+            <div class="card-header">
+                <h3 class="card-title">Daftar Entitas Stok Rol Fisik (Batch / SKU Terpisah)</h3>
+                <span class="badge badge-teal">{{ $product->batches->where('remaining_qty', '>', 0)->count() }} Rol Aktif</span>
+            </div>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>SKU Batch Rol</th>
+                            <th>Ref. Penerimaan</th>
+                            <th>Tanggal Masuk</th>
+                            <th class="text-right">Kapasitas Awal</th>
+                            <th class="text-right">Sisa Stok Rol</th>
+                            <th class="text-right">HPP Masuk / {{ $product->baseUnit->name }}</th>
+                            <th class="text-center">Status Rol</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($product->batches as $batch)
+                            <tr>
+                                <td class="font-mono text-xs font-bold text-teal-700">{{ $batch->batch_sku }}</td>
+                                <td class="font-mono text-xs">
+                                    @if ($batch->goodsReceipt)
+                                        <a href="{{ route('purchase-orders.show', $batch->goodsReceipt->purchase_order_id) }}" class="text-teal-600 hover:underline">
+                                            {{ $batch->goodsReceipt->gr_number }}
+                                        </a>
+                                    @else
+                                        Saldo Awal
+                                    @endif
+                                </td>
+                                <td>{{ $batch->received_date ? $batch->received_date->format('d/m/Y') : '—' }}</td>
+                                <td class="num">{{ num($batch->initial_qty, 0) }} {{ $product->baseUnit->name }}</td>
+                                <td class="num font-bold {{ $batch->remaining_qty > 0 ? 'text-emerald-700' : 'text-slate-400' }}">
+                                    {{ num($batch->remaining_qty, 0) }} {{ $product->baseUnit->name }}
+                                </td>
+                                <td class="num">{{ rp($batch->unit_cost) }}</td>
+                                <td class="text-center">
+                                    @if ($batch->remaining_qty <= 0)
+                                        <span class="badge badge-gray">Habis</span>
+                                    @elseif ($batch->remaining_qty < $batch->initial_qty)
+                                        <span class="badge badge-orange">Terpotong (Sisa {{ $batch->remaining_qty }} {{ $product->baseUnit->name }})</span>
+                                    @else
+                                        <span class="badge badge-green">Utuh ({{ $batch->initial_qty }} {{ $product->baseUnit->name }})</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     <div class="card">
         <div class="card-header"><h3 class="card-title">Kartu Stok</h3></div>
         <div class="table-wrap">
@@ -69,7 +124,7 @@
                     <tr>
                         <th>Tanggal</th>
                         <th>Jenis</th>
-                        <th>Referensi</th>
+                        <th>Referensi / Batch</th>
                         <th class="text-right">Masuk</th>
                         <th class="text-right">Keluar</th>
                         <th class="text-right">Biaya/Unit</th>
@@ -86,11 +141,16 @@
                         <tr>
                             <td class="whitespace-nowrap">{{ $m->movement_date->format('d/m/Y H:i') }}</td>
                             <td><span class="badge {{ $in ? 'badge-green' : 'badge-orange' }}">{{ $m->typeLabel() }}</span></td>
-                            <td class="font-mono text-xs">{{ $ref }}</td>
-                            <td class="num text-emerald-700">{{ (float) $m->qty_in > 0 ? '+'.num($m->qty_in) : '—' }}</td>
-                            <td class="num text-orange-700">{{ (float) $m->qty_out > 0 ? '−'.num($m->qty_out) : '—' }}</td>
+                            <td class="font-mono text-xs">
+                                {{ $ref }}
+                                @if ($m->batch)
+                                    <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">{{ $m->batch->batch_sku }}</span>
+                                @endif
+                            </td>
+                            <td class="num text-emerald-700">{{ (float) $m->qty_in > 0 ? '+'.num($m->qty_in, 0) : '—' }}</td>
+                            <td class="num text-orange-700">{{ (float) $m->qty_out > 0 ? '−'.num($m->qty_out, 0) : '—' }}</td>
                             <td class="num">{{ rp($m->unit_cost) }}</td>
-                            <td class="num font-bold">{{ num($m->balance_qty) }}</td>
+                            <td class="num font-bold">{{ num($m->balance_qty, 0) }}</td>
                             <td class="num text-slate-500">{{ rp($m->balance_hpp) }}</td>
                         </tr>
                     @empty

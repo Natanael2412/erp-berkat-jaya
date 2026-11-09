@@ -45,13 +45,25 @@ class ProductService
                 ]);
             }
 
-            $openingQty = (float) ($data['opening_qty'] ?? 0);
+            $openingQty = (int) round((float) ($data['opening_qty'] ?? 0));
             if ($openingQty > 0) {
                 $cost = (float) $data['opening_cost'];
                 $date = $data['opening_date'] ?? now()->toDateString();
                 $product = $this->inventory->lockProducts([$product->id])->first();
+                $product->load('units.unit');
 
-                $this->inventory->stockIn($product, $openingQty, $cost, 'opening', $product, $date);
+                $rollUnit = $product->units->first(fn ($pu) => $pu->is_active && strtoupper($pu->unit?->code ?? '') === 'ROLL');
+                if ($rollUnit && (int) round((float) $rollUnit->conversion_factor) > 1) {
+                    $rollCapacity = (int) round((float) $rollUnit->conversion_factor);
+                    $remaining = $openingQty;
+                    while ($remaining > 0) {
+                        $chunk = min($rollCapacity, $remaining);
+                        $this->inventory->createRollBatch($product, $chunk, $cost, 'opening', $product, $date);
+                        $remaining -= $chunk;
+                    }
+                } else {
+                    $this->inventory->stockIn($product, $openingQty, $cost, 'opening', $product, $date);
+                }
 
                 $value = round($openingQty * $cost, 2);
                 $this->journal->post($date, "Saldo awal persediaan {$product->sku} - {$product->name}", [

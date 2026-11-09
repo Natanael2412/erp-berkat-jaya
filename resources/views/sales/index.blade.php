@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="page-title">Riwayat Penjualan</h2>
-        <p class="page-subtitle">Daftar semua transaksi penjualan dari POS Kasir.</p>
+        <p class="page-subtitle">Daftar semua transaksi penjualan dari Point of Sales (POS).</p>
     </x-slot>
 
     <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -52,7 +52,7 @@
                     <tr>
                         <th>Tanggal & Waktu</th>
                         <th>No. Struk (Invoice)</th>
-                        <th>Kasir</th>
+                        <th>Point of Sales (POS)</th>
                         <th>Metode Bayar</th>
                         <th class="text-right">Total Transaksi</th>
                         <th class="text-center">Status</th>

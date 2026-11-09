@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="page-title">Satuan Barang</h2>
-        <p class="page-subtitle">Kelola master data satuan (PCS, KG, BOX) untuk produk.</p>
+        <h2 class="page-title">Modul Persediaan · Satuan Barang</h2>
+        <p class="page-subtitle">Kelola master data satuan (PCS, M, ROLL, BOX) untuk produk dengan kuantitas bilangan bulat (Integer).</p>
     </x-slot>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -101,11 +101,7 @@
                                 <td class="font-mono font-bold">{{ $unit->code }}</td>
                                 <td class="font-bold text-gunmetal">{{ $unit->name }}</td>
                                 <td>
-                                    @if($unit->allowsDecimal())
-                                        <span class="badge badge-info text-xs">Desimal (Pecahan, e.g. 1.5 M)</span>
-                                    @else
-                                        <span class="badge badge-gray text-xs">Bulat (Non-Desimal)</span>
-                                    @endif
+                                    <span class="badge badge-gray text-xs">Bulat / Integer (Non-Desimal)</span>
                                 </td>
                                 <td class="num">{{ $unit->product_units_count }}</td>
                                 <td class="text-right">

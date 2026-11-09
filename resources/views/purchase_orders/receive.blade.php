@@ -39,11 +39,11 @@
                                 <td class="num font-bold">{{ num($remaining) }}</td>
                                 @if ($remaining > 0)
                                     <td class="bg-emerald-50/60">
-                                        <input type="number" step="0.0001" min="0" name="items[{{ $item->id }}][qty_received]"
-                                               value="{{ old("items.{$item->id}.qty_received", $remaining) }}" class="input num w-28 text-right">
+                                        <input type="number" step="1" min="0" name="items[{{ $item->id }}][qty_received]"
+                                               value="{{ old("items.{$item->id}.qty_received", (int) round($remaining)) }}" class="input num w-28 text-right">
                                     </td>
                                     <td class="bg-red-50/60">
-                                        <input type="number" step="0.0001" min="0" name="items[{{ $item->id }}][qty_rejected]"
+                                        <input type="number" step="1" min="0" name="items[{{ $item->id }}][qty_rejected]"
                                                value="{{ old("items.{$item->id}.qty_rejected", 0) }}" class="input num w-24 text-right">
                                     </td>
                                 @else

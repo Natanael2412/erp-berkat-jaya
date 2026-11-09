@@ -45,7 +45,7 @@
                     </select>
                     @error('role') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     <p class="text-xs text-slate-500 mt-2">
-                        <strong>Owner:</strong> Akses penuh. <strong>Admin:</strong> Operasional & Gudang. <strong>Kasir:</strong> Hanya akses POS/Kasir.
+                        <strong>Owner:</strong> Akses penuh. <strong>Admin:</strong> Operasional & Modul Persediaan. <strong>Point of Sales (POS):</strong> Hanya akses Point of Sales (POS).
                     </p>
                 </div>
 

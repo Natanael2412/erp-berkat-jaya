@@ -30,7 +30,7 @@
                         <div class="font-medium mt-1">{{ $sale->sale_date->format('d/m/Y H:i:s') }}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-slate-500 uppercase tracking-wide font-bold">Kasir</div>
+                        <div class="text-xs text-slate-500 uppercase tracking-wide font-bold">Point of Sales (POS)</div>
                         <div class="font-medium mt-1">{{ $sale->cashier->name }}</div>
                     </div>
                     <div>
@@ -89,7 +89,7 @@
                         @csrf
                         <div class="mb-3">
                             <label class="label">Alasan Void</label>
-                            <input type="text" name="void_reason" required class="input" placeholder="Contoh: Salah input kasir">
+                            <input type="text" name="void_reason" required class="input" placeholder="Contoh: Salah input Point of Sales (POS)">
                         </div>
                         <button type="submit" class="btn btn-danger w-full">Void Transaksi</button>
                     </form>
@@ -120,7 +120,12 @@
                             <tr>
                                 <td>
                                     <div class="font-bold">{{ $item->productUnit->product->name ?? 'Produk Dihapus' }}</div>
-                                    <div class="text-xs text-slate-500">{{ $item->productUnit->product->sku ?? '-' }}</div>
+                                    <div class="text-xs text-slate-500">
+                                        {{ $item->productUnit->product->sku ?? '-' }}
+                                        @if($item->productBatch)
+                                            · <span class="font-mono font-semibold text-teal-700">Batch: {{ $item->productBatch->batch_sku }}</span>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td>{{ $item->productUnit->unit->name ?? '-' }}</td>
                                 <td class="num">Rp {{ number_format($item->unit_price, 0, ',', '.') }}</td>

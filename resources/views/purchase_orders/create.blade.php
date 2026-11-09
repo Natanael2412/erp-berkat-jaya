@@ -67,7 +67,7 @@
                             </div>
                             <div class="md:col-span-2">
                                 <label class="label">Qty</label>
-                                <input type="number" step="0.0001" min="0.0001" class="input" :name="`items[${i}][qty_ordered]`" x-model="row.qty_ordered" required>
+                                <input type="number" step="1" min="1" class="input" :name="`items[${i}][qty_ordered]`" x-model="row.qty_ordered" required>
                             </div>
                             <div class="md:col-span-3">
                                 <label class="label">Harga Beli / Satuan</label>
